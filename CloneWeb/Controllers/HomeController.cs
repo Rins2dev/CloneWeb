@@ -37,6 +37,7 @@ namespace CloneWeb.Controllers
         }
 
         [HttpPost]
+        [ValidateAntiForgeryToken]
         public IActionResult UploadImage(IFormFile file)
         {
             if (file == null || file.Length == 0)

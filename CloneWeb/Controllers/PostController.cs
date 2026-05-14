@@ -51,8 +51,13 @@ namespace CloneWeb.Controllers
             if (!ModelState.IsValid)
                 return BadRequest("Not a valid model");
 
-            var claims = User?.Identities.First().Claims.ToList();
-            var userIdClaim = claims?.FirstOrDefault(x => x.Type == "UserId");
+            if (!_context.Category.Any(c => c.CategoryId == Model.CategoryId))
+                return BadRequest("Invalid category.");
+
+            var identity = User?.Identities.FirstOrDefault();
+            if (identity == null) return Unauthorized();
+            var claims = identity.Claims.ToList();
+            var userIdClaim = claims.FirstOrDefault(x => x.Type == "UserId");
             if (userIdClaim == null) return Unauthorized();
             Model.PostId = Guid.NewGuid();
             Model.CreateTime = DateTime.Now;
@@ -172,8 +177,9 @@ namespace CloneWeb.Controllers
             if (Comment.Length > 2000)
                 return Json(new Response { isSuccess = false, code = 400, message = "Comment is too long (max 2000 characters)." });
 
-            var claims = User?.Identities.First().Claims.ToList();
-            var userIdClaim = claims?.FirstOrDefault(x => x.Type == "UserId");
+            var identity = User?.Identities.FirstOrDefault();
+            if (identity == null) return Unauthorized();
+            var userIdClaim = identity.Claims.FirstOrDefault(x => x.Type == "UserId");
             if (userIdClaim == null) return Unauthorized();
 
             var comments = new Comments
