@@ -1,16 +1,18 @@
-﻿using CookieAuthentication.Models;
+using CookieAuthentication.Models;
 using EntityDataModel.Data;
+using EntityDataModel.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.Extensions.Configuration;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Security.Claims;
-using System.Security.Cryptography;
-using System.Text;
 using System.Threading.Tasks;
+using ViewModel;
 
 namespace CloneWeb.Controllers
 {
@@ -19,102 +21,140 @@ namespace CloneWeb.Controllers
     {
         private readonly IConfiguration _configuration;
         private readonly EntityDataContext _context;
-        public AuthenticationController(IConfiguration configuration , EntityDataContext context)
+        private readonly IPasswordHasher<User> _passwordHasher;
+
+        public AuthenticationController(IConfiguration configuration, EntityDataContext context, IPasswordHasher<User> passwordHasher)
         {
             _configuration = configuration;
             _context = context;
+            _passwordHasher = passwordHasher;
         }
+
         [AllowAnonymous]
         public IActionResult Login(string ReturnUrl = "")
         {
-
-            LoginModel objLoginModel = new LoginModel();
+            var objLoginModel = new LoginModel();
             objLoginModel.ReturnUrl = ReturnUrl;
             return View(objLoginModel);
         }
+
         [HttpPost]
         [AllowAnonymous]
         public async Task<IActionResult> Login(LoginModel objLoginModel)
         {
             if (ModelState.IsValid)
             {
-                var pashMD5 = GetMd5Sum(objLoginModel.Password);
-                var user = _context.User.Where(x => x.UserName == objLoginModel.UserName && x.Password == pashMD5).FirstOrDefault();
+                var user = _context.User.Where(x => x.UserName == objLoginModel.UserName).FirstOrDefault();
                 if (user != null)
                 {
-                    if (string.IsNullOrEmpty(objLoginModel.ReturnUrl))
+                    // Support transitional login: verify against legacy MD5 hash (32-char uppercase hex)
+                    // or current PasswordHasher hash, then rehash if needed
+                    bool passwordValid = false;
+                    if (user.Password != null && user.Password.Length <= 40 && IsHexString(user.Password))
                     {
-                        objLoginModel.ReturnUrl = "/";
+                        // Legacy MD5 — verify then immediately rehash
+                        var legacyHash = GetLegacyMd5(objLoginModel.Password);
+                        if (user.Password.Equals(legacyHash, StringComparison.OrdinalIgnoreCase))
+                        {
+                            passwordValid = true;
+                            user.Password = _passwordHasher.HashPassword(user, objLoginModel.Password);
+                            _context.SaveChanges();
+                        }
                     }
-                    
-                    var claims = new List<Claim>() {
-                        new Claim("UserId", user.UserId.ToString()),
-                        new Claim(ClaimTypes.Name, user.UserName),
-                        new Claim(ClaimTypes.Role, user.Role),
-                    };
-                    var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-                    var principal = new ClaimsPrincipal(identity);
-                    await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties()
+                    else
                     {
-                        IsPersistent = objLoginModel.RememberMe
-                    });
-                    return LocalRedirect(objLoginModel.ReturnUrl);
+                        var result = _passwordHasher.VerifyHashedPassword(user, user.Password, objLoginModel.Password);
+                        passwordValid = result == PasswordVerificationResult.Success || result == PasswordVerificationResult.SuccessRehashNeeded;
+                    }
+
+                    if (passwordValid)
+                    {
+                        if (string.IsNullOrEmpty(objLoginModel.ReturnUrl))
+                            objLoginModel.ReturnUrl = "/";
+
+                        var claims = new List<Claim>() {
+                            new Claim("UserId", user.UserId.ToString()),
+                            new Claim(ClaimTypes.Name, user.UserName),
+                            new Claim(ClaimTypes.Role, user.Role),
+                        };
+                        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
+                        var principal = new ClaimsPrincipal(identity);
+                        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal, new AuthenticationProperties()
+                        {
+                            IsPersistent = objLoginModel.RememberMe
+                        });
+                        return LocalRedirect(objLoginModel.ReturnUrl);
+                    }
                 }
-                else
-                {
-                    ViewBag.Message = "Wrong username or password";
-                    return View(user);
-                }
+
+                ViewBag.Message = "Wrong username or password";
+                return View(objLoginModel);
             }
             return View(objLoginModel);
         }
+
         [AllowAnonymous]
         public IActionResult Register(string ReturnUrl = "")
         {
-
-            LoginModel objLoginModel = new LoginModel();
-            objLoginModel.ReturnUrl = ReturnUrl;
-            return View(objLoginModel);
+            var model = new RegisterModel();
+            model.ReturnUrl = ReturnUrl;
+            return View(model);
         }
-        #region GetRedirectUrl
-        private string GetRedirectUrl(string returnUrl)
+
+        [HttpPost]
+        [AllowAnonymous]
+        [ValidateAntiForgeryToken]
+        public async Task<IActionResult> Register(RegisterModel model)
         {
-            if (string.IsNullOrEmpty(returnUrl) || !Url.IsLocalUrl(returnUrl))
+            if (!ModelState.IsValid)
+                return View(model);
+
+            if (_context.User.Any(x => x.UserName == model.UserName))
             {
-                return Url.Action("Index", "Home");
+                ModelState.AddModelError("UserName", "Username already taken.");
+                return View(model);
             }
 
-            return returnUrl;
+            var user = new User
+            {
+                UserId = Guid.NewGuid(),
+                UserName = model.UserName,
+                Email = model.Email,
+                Role = "User",
+            };
+            user.Password = _passwordHasher.HashPassword(user, model.Password);
+            _context.User.Add(user);
+            await _context.SaveChangesAsync();
+            return RedirectToAction("Login");
         }
-        #endregion GetRedirectUrl
+
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> LogOut()
         {
             await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
             return LocalRedirect("/");
         }
-        public string GetMd5Sum(string str)
+
+        private static bool IsHexString(string s)
         {
-          
-
-            Encoder enc = System.Text.Encoding.Unicode.GetEncoder();
-            byte[] unicodeText = new byte[str.Length * 2];
-
-            enc.GetBytes(str.ToCharArray(), 0, str.Length, unicodeText, 0, true);
-
-
-            MD5 md5 = new MD5CryptoServiceProvider();
-
-            byte[] result = md5.ComputeHash(unicodeText);
-
-            StringBuilder sb = new StringBuilder();
-
-            for (int i = 0; i < result.Length; i++)
+            foreach (char c in s)
             {
-
-                sb.Append(result[i].ToString("X2"));
-
+                if (!((c >= '0' && c <= '9') || (c >= 'A' && c <= 'F') || (c >= 'a' && c <= 'f')))
+                    return false;
             }
-            // And return it
+            return true;
+        }
+
+        private static string GetLegacyMd5(string str)
+        {
+            using var enc = System.Text.Encoding.Unicode;
+            var bytes = enc.GetBytes(str);
+            using var md5 = System.Security.Cryptography.MD5.Create();
+            var hash = md5.ComputeHash(bytes);
+            var sb = new System.Text.StringBuilder();
+            foreach (var b in hash)
+                sb.Append(b.ToString("X2"));
             return sb.ToString();
         }
     }

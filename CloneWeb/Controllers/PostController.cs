@@ -1,4 +1,4 @@
-﻿using EntityDataModel.Data;
+using EntityDataModel.Data;
 using EntityDataModel.Models;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
@@ -13,6 +13,7 @@ using System.Threading.Tasks;
 using ViewModel;
 using ViewModel.Create;
 using ViewModel.ResultViewModel;
+using System.Collections.Generic;
 
 namespace CloneWeb.Controllers
 {
@@ -20,15 +21,18 @@ namespace CloneWeb.Controllers
     {
         private EntityDataContext _context;
         private IConfiguration _configuration;
+
         public PostController(EntityDataContext context, IConfiguration configuration)
         {
             _context = context;
             _configuration = configuration;
         }
+
         public IActionResult Index()
         {
             return View();
         }
+
         [Authorize]
         public IActionResult CreatePost()
         {
@@ -38,6 +42,7 @@ namespace CloneWeb.Controllers
             ViewBag.TagId = new SelectList(lstTag, "TagId", "Title");
             return View();
         }
+
         [HttpPost]
         [ValidateAntiForgeryToken]
         [Authorize]
@@ -45,158 +50,166 @@ namespace CloneWeb.Controllers
         {
             if (!ModelState.IsValid)
                 return BadRequest("Not a valid model");
-            var claimns = User?.Identities.First().Claims.ToList();
+
+            var claims = User?.Identities.First().Claims.ToList();
             Model.PostId = Guid.NewGuid();
             Model.CreateTime = DateTime.Now;
-            Model.CreateBy = Guid.Parse(claimns.Where(x => x.Type == "UserId").FirstOrDefault().Value.ToString());
+            Model.CreateBy = Guid.Parse(claims.Where(x => x.Type == "UserId").FirstOrDefault().Value.ToString());
             Model.Url = ToUrlSlug(Model.Title);
-            if (Model.PostImageUrl != null)
-            {
 
-            }
-            if (Model.TagId != null)
+            if (Model.TagId != null && Model.TagId.Count > 0)
             {
-                if (Model.TagId.Count > 0)
+                foreach (var item in Model.TagId)
                 {
-                    foreach (var item in Model.TagId)
-                    {
-                        _context.Add(new PostTag { PostId = Model.PostId, TagId = (Guid)item });
-                    }
+                    _context.Add(new PostTag { PostId = Model.PostId, TagId = (Guid)item });
                 }
             }
+
             _context.Post.Add(Model);
             _context.SaveChanges();
-
             return RedirectToAction("ListPost");
         }
 
-        public async Task<IActionResult> ListPost()
+        public async Task<IActionResult> ListPost(int page = 1, int pageSize = 10)
         {
-            var lstPost = await _context.Post.ToListAsync();
-            return View();
+            var total = await _context.Post.CountAsync();
+            var lstPost = await _context.Post
+                .OrderByDescending(x => x.CreateTime)
+                .Skip((page - 1) * pageSize)
+                .Take(pageSize)
+                .ToListAsync();
+
+            ViewBag.Paging = new PagingViewModel
+            {
+                PageNumber = page,
+                PageSize = pageSize,
+                TotalRecords = total
+            };
+            return View(lstPost);
         }
+
         [Route("{Year}/{Month}/{Date}/{Url}/{PostId}")]
         public async Task<IActionResult> ViewPost(Guid? PostId)
         {
             var post = await (from db in _context.Post.Include(x => x.PostTag)
                               join cate in _context.Category on db.CategoryId equals cate.CategoryId
-                              //where db.PostId == PostId
+                              join creator in _context.User on db.CreateBy equals creator.UserId into creatorGroup
+                              from creator in creatorGroup.DefaultIfEmpty()
+                              join editor in _context.User on db.LastEditBy equals editor.UserId into editorGroup
+                              from editor in editorGroup.DefaultIfEmpty()
                               where db.PostId == PostId
                               select new PostResultViewModel
                               {
                                   PostId = db.PostId,
                                   Title = db.Title,
                                   CreateBy = db.CreateBy,
-                                  CreateByName = _context.User.Where(x => x.UserId == db.CreateBy).FirstOrDefault().UserName,
+                                  CreateByName = creator != null ? creator.UserName : null,
                                   CreateTime = db.CreateTime,
                                   LastEditBy = db.LastEditBy,
-                                  LastEditByName = _context.User.Where(x => x.UserId == db.LastEditBy).FirstOrDefault().UserName,
+                                  LastEditByName = editor != null ? editor.UserName : null,
                                   LastEditTime = db.LastEditTime,
                                   CategoryName = cate.Title,
                                   PostTag = db.PostTag.ToList(),
                                   PostInfomation = db.PostInfomation,
                                   Url = db.Url,
-                                  Tags = (from db in db.PostTag.ToList()
-                                         join tag in _context.Tag on db.TagId equals tag.TagId
-                                         select tag).ToList(),
-                              }
-                            ).FirstOrDefaultAsync();
+                                  Tags = (from pt in db.PostTag
+                                          join tag in _context.Tag on pt.TagId equals tag.TagId
+                                          select tag).ToList(),
+                              }).FirstOrDefaultAsync();
+
             if (post == null) return NotFound();
-                    
-            post.TotalComments = _context.PostComment.Where(x=>x.PostId == post.PostId).ToList().Count;
+
+            post.TotalComments = _context.PostComment.Where(x => x.PostId == post.PostId).Count();
             ViewBag.PostId = post.PostId;
             ViewBag.PostInfomation = post.PostInfomation;
-
             return View(post);
         }
-       
+
         public async Task<IActionResult> SearchPost(string KeyWord)
         {
             ViewBag.DomainUrl = _configuration["DomainUrl"];
-            KeyWord = KeyWord.Trim();
+            KeyWord = KeyWord?.Trim() ?? string.Empty;
+
             var post = await (from db in _context.Post.Include(x => x.PostComment).Include(x => x.PostTag)
                               join c in _context.Category on db.CategoryId equals c.CategoryId
-                              where (db.Title.Contains(KeyWord))
-                             || c.Title.Contains(KeyWord)
+                              join creator in _context.User on db.CreateBy equals creator.UserId into creatorGroup
+                              from creator in creatorGroup.DefaultIfEmpty()
+                              join editor in _context.User on db.LastEditBy equals editor.UserId into editorGroup
+                              from editor in editorGroup.DefaultIfEmpty()
+                              where db.Title.Contains(KeyWord) || c.Title.Contains(KeyWord)
                               select new PostResultViewModel
                               {
                                   PostId = db.PostId,
                                   Title = db.Title,
                                   CreateBy = db.CreateBy,
-                                  CreateByName = _context.User.Where(x => x.UserId == db.CreateBy).FirstOrDefault().UserName,
+                                  CreateByName = creator != null ? creator.UserName : null,
                                   CreateTime = db.CreateTime,
                                   LastEditBy = db.LastEditBy,
-                                  LastEditByName = _context.User.Where(x => x.UserId == db.LastEditBy).FirstOrDefault().UserName,
+                                  LastEditByName = editor != null ? editor.UserName : null,
                                   LastEditTime = db.LastEditTime,
                                   CategoryName = c.Title,
                                   PostTag = db.PostTag.ToList(),
                                   PostInfomation = db.PostInfomation,
                                   TotalComments = db.PostComment.Count(),
-                                  Tags = (from db in db.PostTag.ToList()
-                                          join tag in _context.Tag on db.TagId equals tag.TagId
+                                  Tags = (from pt in db.PostTag
+                                          join tag in _context.Tag on pt.TagId equals tag.TagId
                                           select tag).ToList(),
                               }).ToListAsync();
 
             return View(post);
         }
+
         [Authorize]
         public IActionResult AddComment(Guid PostId, string Comment)
         {
             try
             {
-                var claimns = User?.Identities.First().Claims.ToList();
+                var claims = User?.Identities.First().Claims.ToList();
 
-                var comments = new Comments();
-                comments.CommentId = Guid.NewGuid();
-                comments.CreateTime = DateTime.Now;
-                comments.CommentMessage = Comment;
-                comments.CreateBy = Guid.Parse(claimns.Where(x=>x.Type == "UserId").FirstOrDefault().Value.ToString());
-                
-                var PostCmt = new PostComment();
-                PostCmt.PostId = PostId;
-                PostCmt.CommentId = comments.CommentId;
+                var comments = new Comments
+                {
+                    CommentId = Guid.NewGuid(),
+                    CreateTime = DateTime.Now,
+                    CommentMessage = Comment,
+                    CreateBy = Guid.Parse(claims.Where(x => x.Type == "UserId").FirstOrDefault().Value.ToString())
+                };
+
+                var postComment = new PostComment
+                {
+                    PostId = PostId,
+                    CommentId = comments.CommentId
+                };
 
                 _context.Comments.Add(comments);
-                _context.PostComment.Add(PostCmt);
+                _context.PostComment.Add(postComment);
                 _context.SaveChanges();
-                return Json(Ok(new Reponse { isSuccess = true, code = 200 }
-                          ));
+                return Json(Ok(new Response { isSuccess = true, code = 200 }));
             }
             catch (Exception)
             {
                 throw;
             }
         }
+
         public IActionResult ReloadComment(Guid? PostId)
         {
             return ViewComponent("ListComments", new { PostId = PostId });
         }
+
         public IActionResult ReloadRecentComment(Guid? PostId)
         {
             return ViewComponent("ListRecentComment");
         }
+
         public static string ToUrlSlug(string value)
         {
-
-            //First to lower case
             value = value.ToLowerInvariant();
-
-            //Remove all accents
             var bytes = Encoding.GetEncoding("Cyrillic").GetBytes(value);
             value = Encoding.ASCII.GetString(bytes);
-
-            //Replace spaces
             value = Regex.Replace(value, @"\s", "-", RegexOptions.Compiled);
-
-            //Remove invalid chars
             value = Regex.Replace(value, @"[^a-z0-9\s-_]", "", RegexOptions.Compiled);
-
-            //Trim dashes from end
             value = value.Trim('-', '_');
-
-            //Replace double occurences of - or _
             value = Regex.Replace(value, @"([-_]){2,}", "$1", RegexOptions.Compiled);
-
             return value;
         }
     }

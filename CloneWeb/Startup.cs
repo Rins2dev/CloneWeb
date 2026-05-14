@@ -16,7 +16,9 @@ using Microsoft.IdentityModel.Tokens;
 using System;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using EntityDataModel.Models;
 
 namespace CloneWeb
 {
@@ -73,6 +75,7 @@ namespace CloneWeb
             services.AddMvc();
             services.AddAuthorization();
             services.AddSignalR();
+            services.AddScoped<IPasswordHasher<User>, PasswordHasher<User>>();
         }
 
         // This method gets called by the runtime. Use this method to configure the HTTP request pipeline.

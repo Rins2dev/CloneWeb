@@ -1,5 +1,5 @@
-﻿@{
-    var claimns = User?.Identities.First().Claims.ToList();
+@{
+    var isAuthenticated = User?.Identity?.IsAuthenticated == true;
 }
 <!DOCTYPE html>
 <html lang="en">
@@ -20,14 +20,11 @@
                     <ul>
                         <li>  @Html.ActionLink("Home","Index","Home")  </li>
                         <li> @Html.ActionLink("About","Index","About") </li>
-                        @*  <li> <a href="#">R4ndom’s Beginning Reverse Engineering Tutorials </a> </li>
-                        <li> <a href="#">Slugsnack’s Reversing Series by c0lo </a> </li>*@
                     </ul>
                 </div>
                 <div class="float-right">
                     <ul>
-                        
-                        @if (claimns.Count <= 0 )
+                        @if (!isAuthenticated)
                         {
                             <li> @Html.ActionLink("Login","Login","Authentication") </li>
                             <li> @Html.ActionLink("Register","Register","Authentication") </li>
@@ -35,7 +32,12 @@
                         else
                         {
                             <li> @Html.ActionLink("Create Post","CreatePost","Post") </li>
-                            <li> @Html.ActionLink("Logout","Logout","Authentication") </li>
+                            <li>
+                                <form asp-controller="Authentication" asp-action="LogOut" method="post" style="display:inline">
+                                    @Html.AntiForgeryToken()
+                                    <button type="submit" class="btn btn-link p-0">Logout</button>
+                                </form>
+                            </li>
                         }
                     </ul>
                 </div>
@@ -53,47 +55,42 @@
                         <li id="search">
                             <h2 class="sidebartitle">Tìm kiếm</h2>
                             <div class="search-box">
-                                <form id="frmSearch" method="post" asp-controller="Post" asp-action="SearchPost">
+                                <form id="frmSearch" method="get" asp-controller="Post" asp-action="SearchPost">
                                     <input type="text" size="15" class="search-field" name="KeyWord" id="KeyWord" placeholder="Search this site"><input type="submit" value="" class="search-go">
                                 </form>
                             </div>
                         </li>
-                        <li id="recent-post">
+                        <li id="recent-posts">
                             <h2 class="sidebartitle">Recent Posts</h2>
 
                             @await Component.InvokeAsync("ListRecentPost")
 
                         </li>
-                        <li id="recent-post">
+                        <li id="recent-comments">
                             <h2 class="sidebartitle">Recent Comments</h2>
                             <div id="list-recent-comment">
                                 @await Component.InvokeAsync("ListRecentComment")
                             </div>
                         </li>
-                        @* <li id="recent-post">
-                        <h2 class="sidebartitle">Pages</h2>
-                        @await Component.InvokeAsync("ListPages")
-                        </li>*@
-                        <li id="recent-post">
+                        <li id="categories">
                             <h2 class="sidebartitle">Categories</h2>
                             <div id="list-category">
                                 @await Component.InvokeAsync("ListCategory")
-
                             </div>
                         </li>
-                        <li id="recent-post">
+                        <li id="top-posts">
                             <h2 class="sidebartitle">Top post</h2>
-                            <div id="list-recent-post">
+                            <div id="list-top-post">
                                 @await Component.InvokeAsync("ListRecentPost")
                             </div>
                         </li>
-                        <li id="recent-post">
+                        <li id="list-posts">
                             <h2 class="sidebartitle">List Post </h2>
-                            <div id="list-recent-post">
+                            <div id="list-all-post">
                                 @await Component.InvokeAsync("ListRecentPost")
                             </div>
                         </li>
-                        <li id="recent-post">
+                        <li id="statistics">
                             <h2 class="sidebartitle">Statistics</h2>
                             <div id="total-visit">
                                 @await Component.InvokeAsync("TotalVisit")
@@ -114,7 +111,7 @@
     </div>
 
     <div id="footer-bott">
-        <a href="https://www.facebook.com/rin2709">Coppy right © by Rin</a>
+        <a href="https://www.facebook.com/rin2709">Copyright &copy; by Rin</a>
     </div>
     <div class="footerbar">
     </div>

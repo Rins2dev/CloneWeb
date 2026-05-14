@@ -20,3 +20,18 @@ namespace EnityModel.Data
         }
     }
 }
+
+namespace EntityDataModel.Data
+{
+    public partial class EntityDataContext
+    {
+        partial void OnModelCreatingPartial(ModelBuilder modelBuilder)
+        {
+            // PasswordHasher produces hashes ~84 chars; override the auto-generated HasMaxLength(50)
+            modelBuilder.Entity<EntityDataModel.Models.User>(entity =>
+            {
+                entity.Property(e => e.Password).HasMaxLength(256);
+            });
+        }
+    }
+}

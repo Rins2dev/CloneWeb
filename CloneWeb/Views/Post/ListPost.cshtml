@@ -1,1 +1,56 @@
-﻿<p> List Đây</p>
+@using EntityDataModel.Models
+@using ViewModel
+@model List<Post>
+
+@{
+    ViewData["Title"] = "All Posts";
+    var paging = ViewBag.Paging as PagingViewModel;
+}
+
+<h2 style="border-bottom: 1px dashed #575b59; font-size: 25px">All Posts</h2>
+
+@if (Model == null || Model.Count == 0)
+{
+    <h3 style="color:#c00; font-size:15px; margin-top:15px">No posts found.</h3>
+}
+else
+{
+    @foreach (var item in Model)
+    {
+        <div class="row">
+            <div class="posttitle">
+                <h2 class="pagetitle">@item.Title</h2>
+            </div>
+            <small>Posted: @item.CreateTime?.ToString("yyyy-MM-dd")</small>
+            <div class="entry" style="width:100%;">
+                @Html.Raw(item.PostInfomation)
+            </div>
+        </div>
+    }
+
+    @if (paging != null && paging.TotalPages > 1)
+    {
+        <nav>
+            <ul class="pagination">
+                @if (paging.HasPrev)
+                {
+                    <li class="page-item">
+                        <a class="page-link" asp-action="ListPost" asp-route-page="@(paging.PageNumber - 1)" asp-route-pageSize="@paging.PageSize">Previous</a>
+                    </li>
+                }
+                @for (int i = 1; i <= paging.TotalPages; i++)
+                {
+                    <li class="page-item @(i == paging.PageNumber ? "active" : "")">
+                        <a class="page-link" asp-action="ListPost" asp-route-page="@i" asp-route-pageSize="@paging.PageSize">@i</a>
+                    </li>
+                }
+                @if (paging.HasNext)
+                {
+                    <li class="page-item">
+                        <a class="page-link" asp-action="ListPost" asp-route-page="@(paging.PageNumber + 1)" asp-route-pageSize="@paging.PageSize">Next</a>
+                    </li>
+                }
+            </ul>
+        </nav>
+    }
+}

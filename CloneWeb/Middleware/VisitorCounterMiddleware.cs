@@ -30,7 +30,7 @@ namespace CloneWeb.Middleware
                 {
                     Path = "/",
                     HttpOnly = true,
-                    Secure = false,
+                    Secure = true,
                 });
                 context.Items.Add("Visitor", Value);
             }

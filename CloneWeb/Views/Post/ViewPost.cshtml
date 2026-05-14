@@ -2,7 +2,7 @@
     ViewData["Title"] = Model.Title;
     ViewData["Type"] = "Post";
     string href = String.Concat(ViewBag.DomainUrl, "Post/ViewPost/?PostId=" + Model.PostId);
-    var claimns = User?.Identities.First().Claims.ToList();
+    var isAuthenticated = User?.Identity?.IsAuthenticated == true;
 }
 @using ViewModel.ResultViewModel
 @model PostResultViewModel;
@@ -75,7 +75,7 @@
 <div id="respondcon">
     <h3 class="reply-title">Leave a Reply </h3>
     <div class="comments-message">
-        @if (claimns.Count <= 0)
+        @if (!isAuthenticated)
         {
             <div>
                 <p style="font-size : 10px"> Please login to comment </p>

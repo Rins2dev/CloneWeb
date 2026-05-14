@@ -1,25 +1,26 @@
-﻿using Microsoft.AspNetCore.SignalR;
-using System.Threading.Tasks;
+using Microsoft.AspNetCore.SignalR;
 using System;
+using System.Threading;
+using System.Threading.Tasks;
 
 namespace CloneWeb.Views.ViewComponents
 {
     public class OnlineCountHub : Hub
     {
-        private static int Count = 0;
-        public override Task OnConnectedAsync()
+        private static int _count = 0;
+
+        public override async Task OnConnectedAsync()
         {
-            Count++;
-            base.OnConnectedAsync();
-            Clients.All.SendAsync("updateCount", Count);
-            return Task.CompletedTask;
+            Interlocked.Increment(ref _count);
+            await Clients.All.SendAsync("updateCount", _count);
+            await base.OnConnectedAsync();
         }
-        public override Task OnDisconnectedAsync(Exception exception)
+
+        public override async Task OnDisconnectedAsync(Exception exception)
         {
-            Count--;
-            base.OnDisconnectedAsync(exception);
-            Clients.All.SendAsync("updateCount", Count);
-            return Task.CompletedTask;
+            Interlocked.Decrement(ref _count);
+            await Clients.All.SendAsync("updateCount", _count);
+            await base.OnDisconnectedAsync(exception);
         }
     }
 }
