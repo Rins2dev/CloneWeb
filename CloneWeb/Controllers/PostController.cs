@@ -95,7 +95,7 @@ namespace CloneWeb.Controllers
             return View(lstPost);
         }
 
-        [Route("{Year}/{Month}/{Date}/{Url}/{PostId}")]
+        [Route("Post/ViewPost/{PostId?}")]
         public async Task<IActionResult> ViewPost(Guid? PostId)
         {
             var post = await (from db in _context.Post.Include(x => x.PostTag)

@@ -46,6 +46,9 @@ namespace CloneWeb
                     options.AccessDeniedPath = "/Forbidden/";
                     options.LoginPath = "/Authentication/Login";
                     options.LogoutPath = new PathString("/Authentication/LogOut");
+                    options.Cookie.HttpOnly = true;
+                    options.Cookie.SecurePolicy = CookieSecurePolicy.Always;
+                    options.Cookie.SameSite = SameSiteMode.Strict;
                 });
 
             //services.AddAuthentication(x =>
@@ -91,6 +94,7 @@ namespace CloneWeb
             app.UseStaticFiles();
             app.UseStatusCodePagesWithReExecute("/Error/Index", "?statusCode={0}");
             app.UseRouting();
+            app.UseMiddleware<CloneWeb.Middleware.VisitorCounterMiddleware>();
             app.UseCookiePolicy();
             app.UseAuthentication();
             app.UseAuthorization();

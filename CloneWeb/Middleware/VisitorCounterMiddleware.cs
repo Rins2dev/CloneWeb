@@ -1,10 +1,5 @@
-﻿using EntityDataModel.Data;
-using Microsoft.AspNetCore.Http;
-using Microsoft.AspNetCore.Identity;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.AspNetCore.Http;
 using System;
-using System.Linq;
 using System.Threading.Tasks;
 
 namespace CloneWeb.Middleware
@@ -20,24 +15,19 @@ namespace CloneWeb.Middleware
 
         public async Task Invoke(HttpContext context)
         {
-            int Value = 0;
-            string visitorId = context.Request.Cookies["VisitorId"];
-            if (visitorId == null)
+            if (context.Request.Cookies["VisitorId"] == null)
             {
-                Value++;
-                //don the necessary staffs here to save the count by one
-                context.Response.Cookies.Append("VisitorId", Guid.NewGuid().ToString(), new CookieOptions()
+                context.Response.Cookies.Append("VisitorId", Guid.NewGuid().ToString(), new CookieOptions
                 {
                     Path = "/",
                     HttpOnly = true,
                     Secure = true,
+                    SameSite = SameSiteMode.Strict,
                 });
-                context.Items.Add("Visitor", Value);
+                context.Items.Add("Visitor", 1);
             }
-
 
             await _requestDelegate(context);
         }
-
     }
 }

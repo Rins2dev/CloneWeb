@@ -1,7 +1,7 @@
 ﻿@{
     ViewData["Title"] = Model.Title;
     ViewData["Type"] = "Post";
-    string href = String.Concat(ViewBag.DomainUrl, "Post/ViewPost/?PostId=" + Model.PostId);
+    string href = Url.Action("ViewPost", "Post", new { PostId = Model.PostId }, Context.Request.Scheme);
     var isAuthenticated = User?.Identity?.IsAuthenticated == true;
 }
 @using ViewModel.ResultViewModel
