@@ -66,9 +66,12 @@ namespace CloneWeb.Controllers
 
             if (Model.TagId != null && Model.TagId.Count > 0)
             {
-                foreach (var item in Model.TagId)
+                var validTagIds = _context.Tag.Select(t => (Guid?)t.TagId).ToHashSet();
+                foreach (var tagId in Model.TagId)
                 {
-                    _context.Add(new PostTag { PostId = Model.PostId, TagId = (Guid)item });
+                    if (tagId == null || !validTagIds.Contains(tagId))
+                        return BadRequest("One or more tags are invalid.");
+                    _context.Add(new PostTag { PostId = Model.PostId, TagId = (Guid)tagId });
                 }
             }
 
@@ -119,14 +122,13 @@ namespace CloneWeb.Controllers
                                   PostTag = db.PostTag.ToList(),
                                   PostInfomation = db.PostInfomation,
                                   Url = db.Url,
+                                  TotalComments = _context.PostComment.Count(pc => pc.PostId == db.PostId),
                                   Tags = (from pt in db.PostTag
                                           join tag in _context.Tag on pt.TagId equals tag.TagId
                                           select tag).ToList(),
                               }).FirstOrDefaultAsync();
 
             if (post == null) return NotFound();
-
-            post.TotalComments = _context.PostComment.Where(x => x.PostId == post.PostId).Count();
             ViewBag.PostId = post.PostId;
             ViewBag.PostInfomation = post.PostInfomation;
             return View(post);

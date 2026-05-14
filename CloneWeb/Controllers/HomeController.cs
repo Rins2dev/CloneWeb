@@ -43,6 +43,10 @@ namespace CloneWeb.Controllers
             if (file == null || file.Length == 0)
                 return BadRequest(new { error = new { message = "No file provided." } });
 
+            const long MaxFileSize = 10 * 1024 * 1024; // 10 MB
+            if (file.Length > MaxFileSize)
+                return BadRequest(new { error = new { message = "File too large (max 10 MB)." } });
+
             var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif", ".webp" };
             var extension = Path.GetExtension(file.FileName).ToLowerInvariant();
             if (string.IsNullOrEmpty(extension) || !allowedExtensions.Contains(extension))
