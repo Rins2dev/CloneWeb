@@ -40,6 +40,7 @@ namespace CloneWeb.Controllers
 
         [HttpPost]
         [AllowAnonymous]
+        [ValidateAntiForgeryToken]
         public async Task<IActionResult> Login(LoginModel objLoginModel)
         {
             if (ModelState.IsValid)

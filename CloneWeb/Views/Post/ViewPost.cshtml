@@ -83,12 +83,13 @@
         }
         else
         {
+            <form id="frmComment" style="display:none">@Html.AntiForgeryToken()</form>
             <input class="form-control mb-2" id="commentsmessage" placeholder="Enter comment here" />
             <div class="d-flex justify-content-end">
                 <button class="btn btn-secondary " id="addcomments">Comment</button>
             </div>
         }
-       
+
     </div>
 </div>
 
@@ -121,43 +122,34 @@
         };
 
         function CommentPost(Comment, PostId) {
+            var token = $("#frmComment input[name='__RequestVerificationToken']").val();
             $.ajax({
                 type: "POST",
                 url: "/Post/AddComment",
                 data: {
+                    __RequestVerificationToken: token,
                     Comment: Comment,
                     PostId: PostId
                 },
                 dataType: "json",
                 success: function (jsonData) {
-                    if (jsonData.statusCode = "200") {
-                        //load lại list comment
+                    if (jsonData.isSuccess === true) {
                         $.ajax({
                             url: "@Url.Action("ReloadComment")",
                             data: { PostId: PostId },
                             method: "GET",
                             success: function (data) {
-                                $("#list-comment").html("");
                                 $("#list-comment").html(data);
                             }
                         });
-                        //$.ajax({
-                        //    url: "@Url.Action("ListRecentComment")",
-                        //    method: "GET",
-                        //    success: function (data) {
-                        //        $("#list-recent-comment").html("");
-                        //        $("#list-recent-comment").html(data);
-                        //    }
-                        //});
                         $("#commentsmessage").val("");
-                    }
-                    else {
-                        alert("HUhuhu");
+                    } else {
+                        alert(jsonData.message || "Failed to post comment.");
                     }
                 },
-                error: function (respone) {
-                    console.log(respone);
-                    alert("Lỗi authorize");
+                error: function (response) {
+                    console.log(response);
+                    alert("Error: please login to comment.");
                 }
             });
         }

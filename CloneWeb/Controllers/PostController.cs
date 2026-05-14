@@ -52,9 +52,11 @@ namespace CloneWeb.Controllers
                 return BadRequest("Not a valid model");
 
             var claims = User?.Identities.First().Claims.ToList();
+            var userIdClaim = claims?.FirstOrDefault(x => x.Type == "UserId");
+            if (userIdClaim == null) return Unauthorized();
             Model.PostId = Guid.NewGuid();
             Model.CreateTime = DateTime.Now;
-            Model.CreateBy = Guid.Parse(claims.Where(x => x.Type == "UserId").FirstOrDefault().Value.ToString());
+            Model.CreateBy = Guid.Parse(userIdClaim.Value);
             Model.Url = ToUrlSlug(Model.Title);
 
             if (Model.TagId != null && Model.TagId.Count > 0)
@@ -159,36 +161,39 @@ namespace CloneWeb.Controllers
             return View(post);
         }
 
+        [HttpPost]
+        [ValidateAntiForgeryToken]
         [Authorize]
         public IActionResult AddComment(Guid PostId, string Comment)
         {
-            try
+            if (string.IsNullOrWhiteSpace(Comment))
+                return Json(new Response { isSuccess = false, code = 400, message = "Comment cannot be empty." });
+
+            if (Comment.Length > 2000)
+                return Json(new Response { isSuccess = false, code = 400, message = "Comment is too long (max 2000 characters)." });
+
+            var claims = User?.Identities.First().Claims.ToList();
+            var userIdClaim = claims?.FirstOrDefault(x => x.Type == "UserId");
+            if (userIdClaim == null) return Unauthorized();
+
+            var comments = new Comments
             {
-                var claims = User?.Identities.First().Claims.ToList();
+                CommentId = Guid.NewGuid(),
+                CreateTime = DateTime.Now,
+                CommentMessage = Comment,
+                CreateBy = Guid.Parse(userIdClaim.Value)
+            };
 
-                var comments = new Comments
-                {
-                    CommentId = Guid.NewGuid(),
-                    CreateTime = DateTime.Now,
-                    CommentMessage = Comment,
-                    CreateBy = Guid.Parse(claims.Where(x => x.Type == "UserId").FirstOrDefault().Value.ToString())
-                };
-
-                var postComment = new PostComment
-                {
-                    PostId = PostId,
-                    CommentId = comments.CommentId
-                };
-
-                _context.Comments.Add(comments);
-                _context.PostComment.Add(postComment);
-                _context.SaveChanges();
-                return Json(Ok(new Response { isSuccess = true, code = 200 }));
-            }
-            catch (Exception)
+            var postComment = new PostComment
             {
-                throw;
-            }
+                PostId = PostId,
+                CommentId = comments.CommentId
+            };
+
+            _context.Comments.Add(comments);
+            _context.PostComment.Add(postComment);
+            _context.SaveChanges();
+            return Json(new Response { isSuccess = true, code = 200 });
         }
 
         public IActionResult ReloadComment(Guid? PostId)
