@@ -28,11 +28,6 @@ namespace CloneWeb.Controllers
             _configuration = configuration;
         }
 
-        public IActionResult Index()
-        {
-            return View();
-        }
-
         [Authorize]
         public IActionResult CreatePost()
         {

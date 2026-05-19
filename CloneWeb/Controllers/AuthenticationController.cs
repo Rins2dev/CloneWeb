@@ -70,7 +70,7 @@ namespace CloneWeb.Controllers
 
                     if (passwordValid)
                     {
-                        if (string.IsNullOrEmpty(objLoginModel.ReturnUrl))
+                        if (string.IsNullOrEmpty(objLoginModel.ReturnUrl) || !Url.IsLocalUrl(objLoginModel.ReturnUrl))
                             objLoginModel.ReturnUrl = "/";
 
                         var claims = new List<Claim>() {
