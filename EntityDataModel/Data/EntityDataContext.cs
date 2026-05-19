@@ -125,7 +125,7 @@ namespace EntityDataModel.Data
 
                 entity.Property(e => e.ImageUrl).HasMaxLength(100);
 
-                entity.Property(e => e.Password).HasMaxLength(50);
+                entity.Property(e => e.Password).HasMaxLength(256);
 
                 entity.Property(e => e.Role).HasMaxLength(50);
 

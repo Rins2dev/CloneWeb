@@ -1,4 +1,4 @@
-﻿@using ViewModel.ResultViewModel
+@using ViewModel.ResultViewModel
 @model List<PostResultViewModel>;
 
 @{
@@ -8,10 +8,10 @@
 <h2 style="border-bottom : 1px dashed #575b59; font-size : 25px">Search Results</h2>
 @foreach (var item in Model)
 {
-    string href = String.Concat(ViewBag.DomainUrl, "Post/ViewPost/?PostId=" + item.PostId);
+    string href = Url.Action("ViewPost", "Post", new { PostId = item.PostId });
     <div class="row">
         <div class="posttitle">
-            <h2 href=@href class="pagetitle"> @item.Title  </h2>
+            <h2 class="pagetitle"><a href="@href">@item.Title</a></h2>
         </div>
 
         <div class="postcomments">
@@ -42,11 +42,9 @@
         </small>
 
         <div class="entry" style="width:100% ;">
-
             <div id="htmlcode">
                 @Html.Raw(item.PostInfomation)
             </div>
-
         </div>
 
     </div>
